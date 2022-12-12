@@ -497,7 +497,7 @@ group by point, date order by point
 https://sql-ex.ru/learn_exercises.php?LN=31
 
 ```sql
-
+ Select class, country from classes where bore >= '16'
 ```
 
 
@@ -506,7 +506,12 @@ https://sql-ex.ru/learn_exercises.php?LN=31
 https://sql-ex.ru/learn_exercises.php?LN=32
 
 ```sql
-
+Select country, cast(avg((power(bore,3)/2)) as numeric(6,2)) as weight
+from (select country, classes.class, bore, name from classes left join ships on classes.class=ships.class
+union all
+select distinct country, class, bore, ship from classes t1 left join outcomes t2 on t1.class=t2.ship
+where ship=class and ship not in (select name from ships) ) a
+where name!='null' group by country
 ```
 
 ## 33
@@ -514,7 +519,8 @@ https://sql-ex.ru/learn_exercises.php?LN=32
 https://sql-ex.ru/learn_exercises.php?LN=33
 
 ```sql
-
+Select ship from outcomes where result = 'sunk' and battle = 'North Atlantic'
+  
 ```
 
 ## 34
@@ -522,7 +528,8 @@ https://sql-ex.ru/learn_exercises.php?LN=33
 https://sql-ex.ru/learn_exercises.php?LN=34
 
 ```sql
-
+ Select distinct name from classes, ships where launched >=1922 and displacement>35000 and type='bb' and
+ships.class = classes.class
 ```
 
 
@@ -531,7 +538,7 @@ https://sql-ex.ru/learn_exercises.php?LN=34
 https://sql-ex.ru/learn_exercises.php?LN=35
 
 ```sql
-
+Select model, type from product where model NOT LIKE '%[^0-9]%' OR model NOT LIKE '%[^a-z]%'
 ```
 
 
@@ -540,7 +547,9 @@ https://sql-ex.ru/learn_exercises.php?LN=35
 https://sql-ex.ru/learn_exercises.php?LN=36
 
 ```sql
-
+ Select distinct c.class from classes c join outcomes o on c.class = o.ship
+union
+Select distinct c.class from classes c join ships s on c.class = s.class where s.class = s.name
 ```
 
 
@@ -549,7 +558,10 @@ https://sql-ex.ru/learn_exercises.php?LN=36
 https://sql-ex.ru/learn_exercises.php?LN=37
 
 ```sql
-
+SELECT class from(select class, name from ships
+union
+select class, ship as name from outcomes join classes on classes.class = outcomes.ship) as A
+group by class having count(A.name)=1
 ```
 
 
@@ -559,7 +571,9 @@ https://sql-ex.ru/learn_exercises.php?LN=37
 https://sql-ex.ru/learn_exercises.php?LN=38
 
 ```sql
-
+SELECT country FROM classes where type = 'bb'
+INTERSECT
+SELECT country FROM classes where type = 'bc'
 ```
 
 
@@ -568,7 +582,10 @@ https://sql-ex.ru/learn_exercises.php?LN=38
 https://sql-ex.ru/learn_exercises.php?LN=39
 
 ```sql
-
+SELECT distinct o.ship from outcomes o join battles b on o.battle = b.name where o.result = 'damaged' AND
+EXISTS (SELECT battles.date
+FROM battles join outcomes on outcomes.battle = battles.name
+WHERE battles.date > b.date and outcomes.ship = o.ship)
 ```
 
 
@@ -578,7 +595,10 @@ https://sql-ex.ru/learn_exercises.php?LN=39
 https://sql-ex.ru/learn_exercises.php?LN=40
 
 ```sql
-
+select maker, type from product
+where maker in (SELECT maker FROM
+(SELECT maker, type FROM Product GROUP BY maker, type) Alias
+group by maker having count(maker) = 1) group by maker, type having count(type)>1
 ```
 
 ## 41
@@ -586,7 +606,18 @@ https://sql-ex.ru/learn_exercises.php?LN=40
 https://sql-ex.ru/learn_exercises.php?LN=41
 
 ```sql
-
+with D as
+(select model, price from PC
+union
+select model, price from Laptop
+union
+select model, price from Printer)
+Select distinct P.maker,
+CASE WHEN MAX(CASE WHEN D.price IS NULL THEN 1 ELSE 0 END) = 0 THEN
+MAX(D.price) END
+from Product P
+right join D on P.model=D.model
+group by P.maker
 ```
 
 
@@ -595,7 +626,7 @@ https://sql-ex.ru/learn_exercises.php?LN=41
 https://sql-ex.ru/learn_exercises.php?LN=42
 
 ```sql
-
+ Select ship, battle from outcomes where result = 'sunk'
 ```
 
 
@@ -605,7 +636,8 @@ https://sql-ex.ru/learn_exercises.php?LN=42
 https://sql-ex.ru/learn_exercises.php?LN=43
 
 ```sql
-
+select name from battles where DATEPART(yy, date) not in (select DATEPART(yy, date)
+from battles join ships on DATEPART(yy, date)=launched)
 ```
 
 
@@ -614,7 +646,9 @@ https://sql-ex.ru/learn_exercises.php?LN=43
 https://sql-ex.ru/learn_exercises.php?LN=44
 
 ```sql
-
+ Select name from ships where name like 'R%'
+union
+Select ship from outcomes where ship like 'R%'
 ```
 
 
@@ -623,7 +657,9 @@ https://sql-ex.ru/learn_exercises.php?LN=44
 https://sql-ex.ru/learn_exercises.php?LN=45
 
 ```sql
-
+Select name from ships where name like '% % %'
+union
+Select ship from outcomes where ship like '% % %'
 ```
 
 
@@ -632,7 +668,9 @@ https://sql-ex.ru/learn_exercises.php?LN=45
 https://sql-ex.ru/learn_exercises.php?LN=46
 
 ```sql
-
+ SELECT DISTINCT ship, displacement, numguns
+FROM classes LEFT JOIN ships ON classes.class=ships.class RIGHT JOIN outcomes ON classes.class=ship OR ships.name=ship
+WHERE battle='Guadalcanal'
 ```
 
 
@@ -642,7 +680,40 @@ https://sql-ex.ru/learn_exercises.php?LN=46
 https://sql-ex.ru/learn_exercises.php?LN=47
 
 ```sql
+WITH out AS (SELECT *
+FROM outcomes JOIN (SELECT ships.name s_name, classes.class s_class, classes.country s_country
+FROM ships FULL JOIN classes
+ON ships.class = classes.class
+) u
+ON outcomes.ship=u.s_class
+UNION
+SELECT *
+FROM outcomes JOIN (SELECT ships.name s_name, classes.class s_class, classes.country s_country
+FROM ships FULL JOIN classes
+ON ships.class = classes.class
+) u
+ON outcomes.ship=u.s_name)
+SELECT fin.country
+FROM (
+SELECT DISTINCT t.country, COUNT(t.name) AS num_ships
+FROM (
+select distinct c.country, s.name
+from classes c
+inner join Ships s on s.class= c.class
+union
+select distinct c.country, o.ship
+from classes c
+inner join Outcomes o on o.ship= c.class) t
+GROUP BY t.country
 
+
+INTERSECT
+
+
+SELECT out.s_country, COUNT(out.ship) AS num_ships
+FROM out
+WHERE out.result='sunk'
+GROUP BY out.s_country) fin
 ```
 
 
@@ -651,7 +722,11 @@ https://sql-ex.ru/learn_exercises.php?LN=47
 https://sql-ex.ru/learn_exercises.php?LN=48
 
 ```sql
-
+select class
+from classes t1 left join outcomes t2 on t1.class=t2.ship where result='sunk'
+union
+select class
+from ships left join outcomes on ships.name=outcomes.ship where result='sunk'
 ```
 
 
@@ -660,7 +735,9 @@ https://sql-ex.ru/learn_exercises.php?LN=48
 https://sql-ex.ru/learn_exercises.php?LN=49
 
 ```sql
-
+select s.name from ships s join classes c on s.name=c.class or s.class = c.class where c.bore = 16
+union
+select o.ship from outcomes o join classes c on o.ship=c.class where c.bore = 16
 ```
 
 
@@ -669,7 +746,7 @@ https://sql-ex.ru/learn_exercises.php?LN=49
 https://sql-ex.ru/learn_exercises.php?LN=50
 
 ```sql
-
+Select distinct o.battle from ships s join outcomes o on s.name = o.ship where s.class = 'kongo'
 ```
 
 
@@ -678,7 +755,7 @@ https://sql-ex.ru/learn_exercises.php?LN=50
 https://sql-ex.ru/learn_exercises.php?LN=51
 
 ```sql
-
+select NAME from(select name as NAME, displacement, numguns from ships inner join classes on ships.class = classes.class union select ship as NAME, displacement, numguns from outcomes inner join classes on outcomes.ship= classes.class) as d1 inner join (select displacement, max(numGuns) as numguns from ( select displacement, numguns from ships inner join classes on ships.class = classes.class union select displacement, numguns from outcomes inner join classes on outcomes.ship= classes.class) as f group by displacement) as d2 on d1.displacement=d2.displacement and d1.numguns =d2.numguns
 ```
 
 
@@ -687,7 +764,7 @@ https://sql-ex.ru/learn_exercises.php?LN=51
 https://sql-ex.ru/learn_exercises.php?LN=52
 
 ```sql
-
+select s.name from ships s join classes c on s.class = c.class where country = 'japan' and (numGuns >= '9' or numGuns is null) and (bore < '19' or bore is null) and (displacement <= '65000' or displacement is null) and type='bb'
 ```
 
 
@@ -696,7 +773,7 @@ https://sql-ex.ru/learn_exercises.php?LN=52
 https://sql-ex.ru/learn_exercises.php?LN=53
 
 ```sql
-
+ Select CAST(AVG(numguns*1.0) AS NUMERIC(6,2)) as Avg_nmg from classes where type = 'bb'
 ```
 
 
@@ -705,7 +782,9 @@ https://sql-ex.ru/learn_exercises.php?LN=53
 https://sql-ex.ru/learn_exercises.php?LN=54
 
 ```sql
-
+select CAST(AVG(numguns*1.0) AS NUMERIC(6,2)) as AVG_nmg from (select ship, numguns, type from Outcomes join classes on ship = class
+union
+select name, numguns, type from ships s join classes c on c.class = s.class) as x where type = 'bb'
 ```
 
 
@@ -714,7 +793,7 @@ https://sql-ex.ru/learn_exercises.php?LN=54
 https://sql-ex.ru/learn_exercises.php?LN=55
 
 ```sql
-
+ Select c.class, min(s.launched) from classes c left join ships s on c.class = s.class group by c.class
 ```
 
 
@@ -723,7 +802,13 @@ https://sql-ex.ru/learn_exercises.php?LN=55
 https://sql-ex.ru/learn_exercises.php?LN=56
 
 ```sql
-
+SELECT c.class, COUNT(s.ship)
+FROM classes c
+LEFT JOIN (SELECT o.ship, sh.class
+FROM outcomes o
+LEFT JOIN ships sh ON sh.name = o.ship
+WHERE o.result = 'sunk') AS s ON s.class = c.class OR s.ship = c.class
+GROUP BY c.class
 ```
 
 
@@ -732,7 +817,13 @@ https://sql-ex.ru/learn_exercises.php?LN=56
 https://sql-ex.ru/learn_exercises.php?LN=57
 
 ```sql
-
+SELECT class, COUNT(ship) count_sunked
+FROM (SELECT name, class FROM ships
+      UNION
+      SELECT ship, ship FROM outcomes) t
+LEFT JOIN outcomes ON name = ship AND result = 'sunk'
+GROUP BY class
+HAVING COUNT(ship) > 0 AND COUNT(*) > 2
 ```
 
 
@@ -741,7 +832,23 @@ https://sql-ex.ru/learn_exercises.php?LN=57
 https://sql-ex.ru/learn_exercises.php?LN=58
 
 ```sql
-
+SELECT m, t,
+CAST(100.0*cc/cc1 AS NUMERIC(5,2))
+from
+(SELECT m, t, sum(c) cc from
+(SELECT distinct maker m, 'PC' t, 0 c from product
+union all
+SELECT distinct maker, 'Laptop', 0 from product
+union all
+SELECT distinct maker, 'Printer', 0 from product
+union all
+SELECT maker, type, count(*) from product
+group by maker, type) as tt
+group by m, t) tt1
+JOIN (
+SELECT maker, count(*) cc1 from product group by maker
+) tt2
+ON m=maker
 ```
 
 
@@ -751,6 +858,18 @@ https://sql-ex.ru/learn_exercises.php?LN=59
 
 ```sql
 
+    SELECT c1, c2-
+(CASE
+WHEN o2 is null THEN 0
+ELSE o2
+END)
+from
+(SELECT point c1, sum(inc) c2 FROM income_o
+group by point) as t1
+left join
+(SELECT point o1, sum(out) o2 FROM outcome_o
+group by point) as t2
+on c1=o1
 ```
 
 
@@ -760,6 +879,20 @@ https://sql-ex.ru/learn_exercises.php?LN=60
 
 ```sql
 
+    SELECT c1, c2-
+(CASE
+WHEN o2 is null THEN 0
+ELSE o2
+END)
+from
+(SELECT point c1, sum(inc) c2 FROM income_o
+where date<'2001-04-15'
+group by point) as t1
+left join
+(SELECT point o1, sum(out) o2 FROM outcome_o
+where date<'2001-04-15'
+group by point) as t2
+on c1=o1
 ```
 
 
